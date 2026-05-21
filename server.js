@@ -6,11 +6,10 @@ const app = express();
 const db = new Database('vouches.db');
 
 // 1. DATABASE SETUP
-// We update the table to include the receiver's Discord Username
 try {
   db.prepare("ALTER TABLE vouches ADD COLUMN receiver_name TEXT").run();
 } catch (e) {
-  // If the column already exists, do nothing!
+  // Column already exists, do nothing
 }
 
 db.prepare(`
@@ -23,8 +22,10 @@ db.prepare(`
   )
 `).run();
 
-// 2. WEBSITE HOMEPAGE (Upgraded UI + Monthly Sorting)
+// 2. WEBSITE HOMEPAGE (With Search Engine + Upgraded UI)
 app.get('/', (request, response) => {
+  // Capture what the user typed in the search bar
+  const searchTerm = request.query.search || '';
   
   // -- GET ALL TIME DATA --
   const allTimeTotal = db.prepare('SELECT COUNT(*) as count FROM vouches').get();
@@ -51,7 +52,44 @@ app.get('/', (request, response) => {
     LIMIT 5
   `).all();
 
-  // Helper function to draw the leaderboard cards
+  // -- SEARCH ENGINE LOGIC --
+  let searchResultsHTML = '';
+  if (searchTerm) {
+    const searchResults = db.prepare(`
+      SELECT receiver_id, receiver_name, COUNT(*) as count 
+      FROM vouches 
+      WHERE receiver_name LIKE ?
+      GROUP BY receiver_id 
+      ORDER BY count DESC
+    `).all(`%${searchTerm}%`);
+
+    if (searchResults.length === 0) {
+      searchResultsHTML = `
+        <div class="section-box search-box" style="width: 100%; max-width: 1000px; margin-bottom: 30px; border-color: #ff4a4a;">
+          <h2 style="color: #ff4a4a; border-bottom-color: #ff4a4a;">🔍 Search Results</h2>
+          <p style="color: #aaa; padding: 10px;">No players found matching "${searchTerm}"</p>
+        </div>`;
+    } else {
+      let cardList = '';
+      searchResults.forEach((row) => {
+        const name = row.receiver_name || `User ID: ${row.receiver_id}`;
+        cardList += `
+          <div class="leaderboard-card">
+            <span class="medal">👤</span>
+            <span class="username">${name}</span>
+            <span class="score">${row.count} Total Vouches</span>
+          </div>
+        `;
+      });
+      searchResultsHTML = `
+        <div class="section-box search-box" style="width: 100%; max-width: 1000px; margin-bottom: 30px; border-color: #03dac6;">
+          <h2 style="color: #03dac6; border-bottom-color: #03dac6;">🔍 Search Results for "${searchTerm}"</h2>
+          ${cardList}
+        </div>`;
+    }
+  }
+
+  // Helper function to build leaderboard loops
   const buildList = (leaders) => {
     if (leaders.length === 0) return '<p style="color: #aaa; padding: 20px;">No vouches yet!</p>';
     let html = '';
@@ -69,7 +107,7 @@ app.get('/', (request, response) => {
     return html;
   };
 
-  // The actual website design (HTML/CSS)
+  // Modern Neon Web Dashboard Template
   response.send(`
     <!DOCTYPE html>
     <html>
@@ -87,8 +125,49 @@ app.get('/', (request, response) => {
           text-align: center;
         }
         h1 { color: #bb86fc; font-size: 2.5em; text-shadow: 0 0 15px rgba(187,134,252,0.5); margin-bottom: 5px; }
-        p.subtitle { color: #cccccc; margin-top: 0; font-size: 1.1em; margin-bottom: 40px; }
+        p.subtitle { color: #cccccc; margin-top: 0; font-size: 1.1em; margin-bottom: 30px; }
         
+        /* Search Bar Style */
+        .search-container {
+          margin-bottom: 40px;
+        }
+        .search-form {
+          display: inline-flex;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(187, 134, 252, 0.3);
+          border-radius: 30px;
+          padding: 5px 5px 5px 20px;
+          align-items: center;
+          transition: all 0.3s ease;
+        }
+        .search-form:focus-within {
+          border-color: #bb86fc;
+          box-shadow: 0 0 15px rgba(187,134,252,0.3);
+        }
+        .search-input {
+          background: none;
+          border: none;
+          color: white;
+          font-size: 1em;
+          outline: none;
+          width: 200px;
+        }
+        .search-btn {
+          background: #bb86fc;
+          color: #121212;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 25px;
+          font-weight: bold;
+          cursor: pointer;
+          margin-left: 10px;
+          transition: all 0.3s;
+        }
+        .search-btn:hover {
+          background: #03dac6;
+          box-shadow: 0 0 10px rgba(3,218,198,0.5);
+        }
+
         .container {
           display: flex;
           flex-wrap: wrap;
@@ -158,7 +237,16 @@ app.get('/', (request, response) => {
       <h1>🏴‍☠️ Blox Fruits Traders 🏴‍☠️</h1>
       <p class="subtitle">Live Server Vouch Leaderboard</p>
       
+      <div class="search-container">
+        <form action="/" method="GET" class="search-form">
+          <input type="text" name="search" class="search-input" placeholder="Search player username..." value="${searchTerm}">
+          <button type="submit" class="search-btn">Search</button>
+        </form>
+      </div>
+
       <div class="container">
+        ${searchResultsHTML}
+
         <div class="section-box">
           <h2>📅 This Month</h2>
           <div class="total-badge">Total Vouches: ${monthTotal.count}</div>
@@ -218,21 +306,20 @@ client.on('messageCreate', async (message) => {
       return message.reply('❌ Your Discord account must be at least 14 days old to submit vouches (Anti-Alt system).');
     }
 
-    // Save to Database (Now saving their actual Discord username!)
+    // Save Vouch data along with current username
     const insert = db.prepare('INSERT INTO vouches (receiver_id, giver_id, receiver_name) VALUES (?, ?, ?)');
     insert.run(member.id, message.author.id, member.user.username);
 
     message.reply(`✅ Vouch successfully recorded for **${member.user.username}**! Proof saved.`);
   }
 
-  // Monthly leaderboard command for Discord
   if (message.content === '!leaderboard') {
     const rows = db.prepare(`
-      SELECT receiver_id, COUNT(*) as count 
+      SELECT receiver_id, receiver_name, COUNT(*) as count 
       FROM vouches 
       WHERE strftime('%Y-%m', timestamp) = strftime('%Y-%m', 'now')
       GROUP BY receiver_id 
-      ORDER BY count DESC 
+      ORDER Rely count DESC 
       LIMIT 3
     `).all();
 
@@ -249,9 +336,10 @@ client.on('messageCreate', async (message) => {
     const medals = ["🥇 1st Place", "🥈 2nd Place", "🥉 3rd Place"];
     
     rows.forEach((row, index) => {
+      const name = row.receiver_name || `<@${row.receiver_id}>`;
       embed.addFields({
         name: medals[index],
-        value: `<@${row.receiver_id}> with **${row.count}** vouches!`,
+        value: `**${name}** with **${row.count}** vouches!`,
         inline: false
       });
     });
@@ -261,3 +349,4 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+      
