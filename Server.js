@@ -124,7 +124,7 @@ client.on('messageCreate', async (message) => {
     const medals = ["🥇 1st Place", "🥈 2nd Place", "🥉 3rd Place"];
     
     rows.forEach((row, index) => {
-      embed.addField({
+      embed.addFields({
         name: medals[index],
         value: `<@${row.receiver_id}> with **${row.count}** vouches!`,
         inline: false
