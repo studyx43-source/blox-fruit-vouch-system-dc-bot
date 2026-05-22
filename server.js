@@ -198,6 +198,10 @@ const client = new Client({
 // ⬇️ VERY IMPORTANT: PASTE YOUR CHANNEL ID BETWEEN THE QUOTES BELOW ⬇️
 const VOUCH_CHANNEL_ID = 'YOUR_CHANNEL_ID_HERE'; 
 
+// Spam protection memory
+const cooldowns = new Map();
+const COOLDOWN_MINUTES = 5;
+
 client.on('ready', () => {
   console.log(`Bot logged in as ${client.user.tag}!`);
 });
@@ -205,10 +209,19 @@ client.on('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
+  // COMMAND 1: !vouch
   if (message.content.startsWith('!vouch')) {
-    
     if (message.channel.id !== VOUCH_CHANNEL_ID) {
       return message.reply(`❌ Please use the <#${VOUCH_CHANNEL_ID}> channel to submit vouches!`);
+    }
+
+    // Cooldown check (5 minutes)
+    if (cooldowns.has(message.author.id)) {
+      const expirationTime = cooldowns.get(message.author.id) + (COOLDOWN_MINUTES * 60 * 1000);
+      if (Date.now() < expirationTime) {
+        const timeLeft = Math.ceil((expirationTime - Date.now()) / 1000 / 60);
+        return message.reply(`⏳ You are doing that too fast! Please wait ${timeLeft} more minute(s) before vouching again.`);
+      }
     }
 
     const member = message.mentions.members.first();
@@ -233,12 +246,55 @@ client.on('messageCreate', async (message) => {
     const args = message.content.split(' ').slice(2);
     const reviewText = args.length > 0 ? args.join(' ') : 'No comment provided.';
 
+    // Save to Database
     const insert = db.prepare('INSERT INTO vouches (receiver_id, giver_id, receiver_name, review) VALUES (?, ?, ?, ?)');
     insert.run(member.id, message.author.id, member.user.username, reviewText);
+
+    // Apply cooldown to the user
+    cooldowns.set(message.author.id, Date.now());
 
     message.reply(`✅ **Vouch Recorded!** Successfully added for **${member.user.username}**.\n💬 *"${reviewText}"*`);
   }
 
+  // COMMAND 2: !check (Check a user's stats)
+  if (message.content.startsWith('!check')) {
+    const member = message.mentions.members.first();
+    if (!member) return message.reply('❌ Mention a user to check! Example: `!check @username`');
+
+    const total = db.prepare('SELECT COUNT(*) as count FROM vouches WHERE receiver_id = ?').get(member.id);
+    
+    const embed = new EmbedBuilder()
+      .setColor(0x00AE86)
+      .setTitle(`🔍 Vouch Record for ${member.user.username}`)
+      .setDescription(`**Total Vouches:** ${total.count}\nCheck the full leaderboard on the website!`)
+      .setThumbnail(member.user.displayAvatarURL());
+
+    message.reply({ embeds: [embed] });
+  }
+
+  // COMMAND 3: !removevouch (Admin Only)
+  if (message.content.startsWith('!removevouch')) {
+    // Check if the user sending the message is an Administrator
+    if (!message.member.permissions.has('Administrator')) {
+      return message.reply('❌ Only server Admins can use this command!');
+    }
+
+    const member = message.mentions.members.first();
+    if (!member) return message.reply('❌ Mention a user to remove their latest vouch! Example: `!removevouch @username`');
+
+    // Find their most recent vouch ID
+    const latestVouch = db.prepare('SELECT id FROM vouches WHERE receiver_id = ? ORDER BY timestamp DESC LIMIT 1').get(member.id);
+    
+    if (!latestVouch) {
+      return message.reply(`❌ **${member.user.username}** doesn't have any vouches to remove.`);
+    }
+
+    // Delete it from the database
+    db.prepare('DELETE FROM vouches WHERE id = ?').run(latestVouch.id);
+    message.reply(`🗑️ **Admin Action:** Successfully deleted the most recent vouch for **${member.user.username}**.`);
+  }
+
+  // COMMAND 4: !leaderboard
   if (message.content === '!leaderboard') {
     const rows = db.prepare(`
       SELECT receiver_id, receiver_name, COUNT(*) as count 
@@ -255,8 +311,7 @@ client.on('messageCreate', async (message) => {
 
     const embed = new EmbedBuilder()
       .setTitle("🏆 Top 3 Trusted Traders This Month 🏆")
-      .setColor(0x00AE86)
-      .setDescription("Here are the traders with the most vouches this month:")
+      .setColor(0xbb86fc)
       .setTimestamp();
 
     const medals = ["🥇 1st Place", "🥈 2nd Place", "🥉 3rd Place"];
