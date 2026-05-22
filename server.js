@@ -195,7 +195,7 @@ const client = new Client({
   ]
 });
 
-// ⬇️ PASTE YOUR CHANNEL ID BETWEEN THE QUOTES BELOW ⬇️
+// ⬇️ VERY IMPORTANT: PASTE YOUR CHANNEL ID BETWEEN THE QUOTES BELOW ⬇️
 const VOUCH_CHANNEL_ID = 'YOUR_CHANNEL_ID_HERE'; 
 
 client.on('ready', () => {
@@ -207,7 +207,6 @@ client.on('messageCreate', async (message) => {
 
   if (message.content.startsWith('!vouch')) {
     
-    // Check if they are in the correct channel
     if (message.channel.id !== VOUCH_CHANNEL_ID) {
       return message.reply(`❌ Please use the <#${VOUCH_CHANNEL_ID}> channel to submit vouches!`);
     }
@@ -227,23 +226,19 @@ client.on('messageCreate', async (message) => {
       return message.reply('❌ Your Discord account must be at least 14 days old to submit vouches.');
     }
 
-    // Keep the requirement to attach a screenshot for proof, but do not scan it
     if (message.attachments.size === 0) {
       return message.reply('❌ You must attach a screenshot of your Blox Fruits trade as proof!');
     }
 
-    // Extract the review comment
     const args = message.content.split(' ').slice(2);
     const reviewText = args.length > 0 ? args.join(' ') : 'No comment provided.';
 
-    // Save directly to database
     const insert = db.prepare('INSERT INTO vouches (receiver_id, giver_id, receiver_name, review) VALUES (?, ?, ?, ?)');
     insert.run(member.id, message.author.id, member.user.username, reviewText);
 
     message.reply(`✅ **Vouch Recorded!** Successfully added for **${member.user.username}**.\n💬 *"${reviewText}"*`);
   }
 
-  // Monthly leaderboard command
   if (message.content === '!leaderboard') {
     const rows = db.prepare(`
       SELECT receiver_id, receiver_name, COUNT(*) as count 
@@ -280,4 +275,3 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-      
