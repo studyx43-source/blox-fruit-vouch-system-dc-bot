@@ -1,13 +1,11 @@
 const express = require('express');
 const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const Database = require('better-sqlite3');
-const Tesseract = require('tesseract.js');
 
 const app = express();
 const db = new Database('vouches.db');
 
 // 1. DATABASE SETUP
-// Upgrading the table to hold the written reviews
 try { db.prepare("ALTER TABLE vouches ADD COLUMN receiver_name TEXT").run(); } catch (e) {}
 try { db.prepare("ALTER TABLE vouches ADD COLUMN review TEXT").run(); } catch (e) {}
 
@@ -26,7 +24,6 @@ db.prepare(`
 app.get('/', (request, response) => {
   const searchTerm = request.query.search || '';
   
-  // -- GET LEADERBOARD DATA --
   const allTimeTotal = db.prepare('SELECT COUNT(*) as count FROM vouches').get();
   const allTimeLeaders = db.prepare(`
     SELECT receiver_id, receiver_name, COUNT(*) as count 
@@ -45,7 +42,6 @@ app.get('/', (request, response) => {
     GROUP BY receiver_id ORDER BY count DESC LIMIT 5
   `).all();
 
-  // -- GET RECENT REVIEWS FEED --
   const recentReviews = db.prepare(`
     SELECT receiver_name, review, timestamp 
     FROM vouches 
@@ -53,7 +49,6 @@ app.get('/', (request, response) => {
     LIMIT 5
   `).all();
 
-  // -- SEARCH ENGINE --
   let searchResultsHTML = '';
   if (searchTerm) {
     const searchResults = db.prepare(`
@@ -88,7 +83,6 @@ app.get('/', (request, response) => {
     }
   }
 
-  // Builder Functions
   const buildList = (leaders) => {
     if (leaders.length === 0) return '<p style="color: #aaa; padding: 20px;">No vouches yet!</p>';
     let html = '';
@@ -107,7 +101,7 @@ app.get('/', (request, response) => {
   };
 
   const buildReviewFeed = (reviews) => {
-    if (reviews.length === 0) return '<p style="color: #aaa;">No reviews posted yet.</p>';
+    if (reviews.length === 0) return '<p style="color: #aaa;">No vouches posted yet.</p>';
     let html = '';
     reviews.forEach((row) => {
       const name = row.receiver_name || `A user`;
@@ -122,7 +116,6 @@ app.get('/', (request, response) => {
     return html;
   };
 
-  // The Web Dashboard Layout
   response.send(`
     <!DOCTYPE html>
     <html>
@@ -148,8 +141,6 @@ app.get('/', (request, response) => {
         .medal { font-size: 1.5em; }
         .username { font-weight: bold; font-size: 1.1em; flex-grow: 1; text-align: left; margin-left: 15px; }
         .score { color: #03dac6; font-weight: bold; }
-        
-        /* New Styles for Recent Reviews Feed */
         .review-feed-container { margin-top: 30px; width: 100%; }
         .review-card { background: rgba(0,0,0,0.4); border-left: 4px solid #03dac6; margin: 10px 0; padding: 15px; border-radius: 8px; text-align: left; }
         .review-header { color: #bb86fc; font-size: 0.9em; margin-bottom: 8px; }
@@ -169,21 +160,18 @@ app.get('/', (request, response) => {
 
       <div class="container">
         ${searchResultsHTML}
-        
         <div class="section-box">
           <h2>📅 This Month</h2>
           <div class="total-badge">Total Vouches: ${monthTotal.count}</div>
           ${buildList(monthLeaders)}
         </div>
-        
         <div class="section-box">
           <h2>🌟 All-Time Legends</h2>
           <div class="total-badge">Total Vouches: ${allTimeTotal.count}</div>
           ${buildList(allTimeLeaders)}
         </div>
-        
         <div class="section-box review-feed-container">
-          <h2 style="border-bottom-color: #03dac6;">💬 Recent Trade Reviews</h2>
+          <h2 style="border-bottom-color: #03dac6;">💬 Recent Vouches</h2>
           ${buildReviewFeed(recentReviews)}
         </div>
       </div>
@@ -197,7 +185,7 @@ app.listen(port, () => {
   console.log('Website is running on port ' + port);
 });
 
-// 3. DISCORD BOT WITH AI & REVIEWS
+// 3. DISCORD BOT
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -207,6 +195,9 @@ const client = new Client({
   ]
 });
 
+// ⬇️ PASTE YOUR CHANNEL ID BETWEEN THE QUOTES BELOW ⬇️
+const VOUCH_CHANNEL_ID = 'YOUR_CHANNEL_ID_HERE'; 
+
 client.on('ready', () => {
   console.log(`Bot logged in as ${client.user.tag}!`);
 });
@@ -215,6 +206,12 @@ client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
   if (message.content.startsWith('!vouch')) {
+    
+    // Check if they are in the correct channel
+    if (message.channel.id !== VOUCH_CHANNEL_ID) {
+      return message.reply(`❌ Please use the <#${VOUCH_CHANNEL_ID}> channel to submit vouches!`);
+    }
+
     const member = message.mentions.members.first();
 
     if (!member) {
@@ -230,40 +227,20 @@ client.on('messageCreate', async (message) => {
       return message.reply('❌ Your Discord account must be at least 14 days old to submit vouches.');
     }
 
+    // Keep the requirement to attach a screenshot for proof, but do not scan it
     if (message.attachments.size === 0) {
       return message.reply('❌ You must attach a screenshot of your Blox Fruits trade as proof!');
     }
 
-    const attachment = message.attachments.first();
-    if (!attachment.contentType || !attachment.contentType.startsWith('image/')) {
-      return message.reply('❌ The attached file must be an image!');
-    }
-
-    // Extract the review comment (everything after "!vouch @user")
+    // Extract the review comment
     const args = message.content.split(' ').slice(2);
     const reviewText = args.length > 0 ? args.join(' ') : 'No comment provided.';
 
-    const scanningMsg = await message.reply('⏳ **Scanning image...** Please wait while the AI verifies the screenshot.');
+    // Save directly to database
+    const insert = db.prepare('INSERT INTO vouches (receiver_id, giver_id, receiver_name, review) VALUES (?, ?, ?, ?)');
+    insert.run(member.id, message.author.id, member.user.username, reviewText);
 
-    try {
-      const { data: { text } } = await Tesseract.recognize(attachment.url, 'eng');
-      const detectedText = text.toLowerCase();
-
-      // You can add more Blox Fruits specific words here!
-      if (!detectedText.includes('trade') && !detectedText.includes('completed')) {
-         return scanningMsg.edit('❌ **Verification Failed!** The bot could not detect valid trade confirmation text in your screenshot.');
-      }
-
-      // Save everything (including the review) to the database
-      const insert = db.prepare('INSERT INTO vouches (receiver_id, giver_id, receiver_name, review) VALUES (?, ?, ?, ?)');
-      insert.run(member.id, message.author.id, member.user.username, reviewText);
-
-      scanningMsg.edit(`✅ **Vouch Verified & Recorded!** Successfully added for **${member.user.username}**.\n💬 *"${reviewText}"*`);
-
-    } catch (error) {
-      console.error("AI Error:", error);
-      scanningMsg.edit('❌ **Error:** The bot had trouble reading the image. Please upload a clearer screenshot.');
-    }
+    message.reply(`✅ **Vouch Recorded!** Successfully added for **${member.user.username}**.\n💬 *"${reviewText}"*`);
   }
 
   // Monthly leaderboard command
@@ -303,3 +280,4 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+      
