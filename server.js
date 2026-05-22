@@ -196,7 +196,7 @@ const client = new Client({
 });
 
 // ⬇️ VERY IMPORTANT: PASTE YOUR CHANNEL ID BETWEEN THE QUOTES BELOW ⬇️
-const VOUCH_CHANNEL_ID = 'YOUR_CHANNEL_ID_HERE'; 
+const VOUCH_CHANNEL_ID = '1507347264413241364'; 
 
 // Spam protection memory
 const cooldowns = new Map();
