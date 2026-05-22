@@ -9,6 +9,7 @@
   "dependencies": {
     "better-sqlite3": "^11.0.0",
     "discord.js": "^14.15.0",
-    "express": "^4.19.0"
+    "express": "^4.19.0",
+    "tesseract.js": "^5.0.5"
   }
 }
