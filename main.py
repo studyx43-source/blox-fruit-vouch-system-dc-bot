@@ -56,7 +56,7 @@ async def create_ticket(i,kind,item="",qty="",payment="",issue=""):
         if r:ow[r]=discord.PermissionOverwrite(view_channel=True,send_messages=True,read_message_history=True)
     ch=await i.guild.create_text_channel(f"{name}-{oid.split('-')[-1]}",category=cat,overwrites=ow,topic=f"{kind} | {oid}")
     orders=read("orders"); orders[oid]={"kind":kind,"client_id":i.user.id,"channel_id":ch.id,"item":item,"quantity":qty,"payment":payment,"issue":issue,"status":"active","seller_id":None,"amount":None,"currency":None,"created_at":now()}; write("orders",orders)
-    em=discord.Embed(title=f"{E['ticket']} TOWER SUPPLIER • {kind.upper()}",description=f"Order ID: {oid}\nStatus: Active",color=0xFFFFFF)
+    em=discord.Embed(title=f"{E['ticket']} TOWER SUPPLIER {kind.upper()}",description=f"Order ID: {oid}\nStatus: Active",color=0xFFFFFF)
     if kind in ("buy","preorder"):
         em.add_field(name="Item",value=item,inline=False); em.add_field(name="Quantity",value=qty); em.add_field(name="Payment",value=payment)
     else:em.add_field(name="Support request",value=issue,inline=False)
@@ -91,9 +91,9 @@ async def deal(i,oid,o):
     ch=i.guild.get_channel(RECORD)
     if ch:
         seller=f"<@{o['seller_id']}>" if o.get("seller_id") else "Staff"
-        em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER • DEAL COMPLETED",color=0xFFFFFF)
+        em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER DEAL COMPLETED",color=0xFFFFFF)
         pay=f"{E['ltc']} LTC" if o.get("currency")=="LTC" else f"{E['money']} ₹"
-        em.description=f"**Record ID:** `{did}`\n**Order ID:** `{oid}`\n**Type:** {o['kind'].title()}\n**Seller:** {seller}\n**Deal:** {pay} • **{o.get('amount','-')}**\n**Status:** {E['tick']} Completed"
+        em.description=f"**Record ID:** `{did}`\n**Order ID:** `{oid}`\n**Type:** {o['kind'].title()}\n**Seller:** {seller}\n**Deal:** {pay} **{o.get('amount','-')}**\n**Status:** {E['tick']} Completed"
         if o.get("item"):em.add_field(name="Item",value=o["item"]);em.add_field(name="Quantity",value=o.get("quantity") or "-")
         em.set_footer(text="Client identity is not displayed.")
         await ch.send(embed=em)
@@ -200,9 +200,9 @@ class TicketVouchModal(discord.ui.Modal,title="Vouch for this Deal"):
         vid=await newid("vouch","V"); pay="LTC" if o.get("currency")=="LTC" else "INR"
         vs=read("vouches");vs[vid]={"order_id":oid,"seller_id":seller_id,"currency":pay,"stars":n,"review":str(self.review),"submitted_by":i.user.id,"created_at":now()};write("vouches",vs)
         ch=i.guild.get_channel(VOUCH)
-        em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER • VERIFIED VOUCH",color=0xFFFFFF)
+        em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER VERIFIED VOUCH",color=0xFFFFFF)
         em.description=f"{E['ticket']} **Order:** `{oid}`\n{E['blue_arrow']} **Seller:** <@{seller_id}>\n{E['money'] if pay=='INR' else 'ltc'} **Deal Type:** {'₹' if pay=='INR' else 'LTC'} Deal\n⭐ **Rating:** {'⭐'*n}\n{E['chat']} **Review:** {discord.utils.escape_markdown(str(self.review))}\n\n**Vouch ID:** `{vid}`"
-        em.set_footer(text="Verified from a completed Tower Supplier ticket • Client identity hidden")
+        em.set_footer(text="Verified from a completed Tower Supplier ticket Client identity hidden")
         await ch.send(embed=em);await i.response.send_message(f"{E['tick']} Vouch `{vid}` posted.",ephemeral=True)
 
 class VouchModal(discord.ui.Modal,title="Leave a Vouch"):
@@ -227,18 +227,18 @@ class VouchModal(discord.ui.Modal,title="Leave a Vouch"):
         if not ch:return await i.response.send_message(f"{E['alert']} Vouch channel is not configured.",ephemeral=True)
         symbol="LTC" if pay=="LTC" else "₹"
         em=discord.Embed(
-            title=f"{E['tick']} TOWER SUPPLIER • VERIFIED VOUCH",
+            title=f"{E['tick']} TOWER SUPPLIER VERIFIED VOUCH",
             description=(
                 f"{E['ticket']} **Order:** `{oid}`\n"
                 f"{E['blue_arrow']} **Seller:** <@{seller_id}>\n"
                 f"{E['money'] if pay=='INR' else E['ltc']} **Deal Type:** {symbol} Deal\n"
-                f"⭐ **Rating:** {'⭐'*n}\n"
+                f"{E['tick']} **Rating:** {E['tick']*n}\n"
                 f"{E['chat']} **Review:** {discord.utils.escape_markdown(str(self.review))}\n\n"
                 f"**Vouch ID:** `{vid}`"
             ),
             color=0xFFFFFF
         )
-        em.set_footer(text="Seller verified from the staff member who claimed the ticket • Client identity hidden")
+        em.set_footer(text="Seller verified from the staff member who claimed the ticket Client identity hidden")
         await ch.send(embed=em)
         await i.response.send_message(f"{E['tick']} Vouch `{vid}` posted for <@{seller_id}>.",ephemeral=True)
 
@@ -254,7 +254,7 @@ async def on_ready():
 async def panel(ctx):
     if not isowner(ctx.author):return
     em=discord.Embed(
-        title=f"{E['ticket']} TOWER SUPPLIER • ORDER CENTER",
+        title=f"{E['ticket']} TOWER SUPPLIER ORDER CENTER",
         description=(
             f"{E['announcement']} **WELCOME TO TOWER SUPPLIER**\n"
             f"Fast, organized and secure order handling. Choose the correct option below to get started.\n\n"
@@ -267,12 +267,12 @@ async def panel(ctx):
             f"{E['chat']} **SUPPORT**\n"
             f"{E['blue_arrow']} Questions, order problems or other assistance.\n\n"
             f"{E['cash']} **PAYMENT METHODS**\n"
-            f"{E['money']} **₹ INR**  •  {E['ltc']} **LTC**\n\n"
+            f"{E['money']} **₹ INR**  {E['dot']}  {E['ltc']} **LTC**\n\n"
             f"{E['tick']} Completed orders receive a verified deal record and an in-ticket **Create Vouch** option."
         ),
         color=0xFFFFFF
     )
-    em.set_footer(text="Tower Supplier • Invite Only • Select an option below")
+    em.set_footer(text="Tower Supplier Invite Only Select an option below")
     await ctx.send(embed=em,view=Panel())
 @bot.command()
 async def vouch(ctx):
@@ -289,7 +289,7 @@ async def stats(ctx):
                 if o.get("currency")=="INR":ir+=v
                 elif o.get("currency")=="LTC":lt+=v
             except:pass
-    await ctx.send(embed=discord.Embed(title=f"{E['money']} TOWER SUPPLIER • STATS",description=f"Pre-Orders: {len(pos)}\nActive: {a}\nCompleted: {c}\nCancelled: {x}\n\nCompleted value\nINR: ₹{ir:,.2f}\nLTC: {lt:.8f} LTC\n\nDeals: {len(read('records'))}\nVouches: {len(read('vouches'))}",color=0xFFFFFF))
+    await ctx.send(embed=discord.Embed(title=f"{E['money']} TOWER SUPPLIER STATS",description=f"Pre-Orders: {len(pos)}\nActive: {a}\nCompleted: {c}\nCancelled: {x}\n\nCompleted value\nINR: ₹{ir:,.2f}\nLTC: {lt:.8f} LTC\n\nDeals: {len(read('records'))}\nVouches: {len(read('vouches'))}",color=0xFFFFFF))
 @bot.command()
 async def order(ctx,oid=""):
     if not isstaff(ctx.author):return
@@ -297,7 +297,7 @@ async def order(ctx,oid=""):
     if not o:return await ctx.send(f"{E['alert']} Order not found.")
     seller=f"<@{o['seller_id']}>" if o.get("seller_id") else "Unclaimed"
     deal=(f"{'₹' if o.get('currency')=='INR' else 'LTC'} {o.get('amount')}" if o.get("amount") else "Not completed")
-    em=discord.Embed(title=f"{E['ticket']} ORDER • {key}",color=0xFFFFFF)
+    em=discord.Embed(title=f"{E['ticket']} ORDER {key}",color=0xFFFFFF)
     em.description=f"**Type:** {o.get('kind','-').title()}\n**Item:** {o.get('item') or '-'}\n**Quantity:** {o.get('quantity') or '-'}\n**Payment:** {o.get('payment') or '-'}\n**Status:** {o.get('status','-').title()}\n**Seller:** {seller}\n**Final Deal:** {deal}"
     await ctx.send(embed=em)
 
@@ -305,7 +305,7 @@ async def order(ctx,oid=""):
 async def preorders(ctx):
     if not isowner(ctx.author):return
     a=[(k,o) for k,o in read("orders").items() if o["kind"]=="preorder" and o["status"]=="active"]
-    await ctx.send("\n".join(f"{k} • {o.get('item')} x {o.get('quantity')}" for k,o in a[:40]) or "No active pre-orders.")
+    await ctx.send("\n".join(f"{k} {o.get('item')} x {o.get('quantity')}" for k,o in a[:40]) or "No active pre-orders.")
 @bot.command()
 async def preorder(ctx,oid=""):
     if not isstaff(ctx.author):return
@@ -323,7 +323,7 @@ async def deletepreorder(ctx,oid=""):
 @bot.command(name="help")
 async def helpcmd(ctx):
     em=discord.Embed(
-        title=f"{E['announcement']} TOWER SUPPLIER • HELP",
+        title=f"{E['announcement']} TOWER SUPPLIER HELP",
         description=(
             f"{E['ticket']} **Ticket System**\n"
             f"{E['blue_arrow']} `$panel` — Post the Buy / Pre-Order / Support panel *(Owner)*\n"
@@ -335,12 +335,12 @@ async def helpcmd(ctx):
             f"{E['blue_arrow']} `$preorders` — View active pre-orders *(Owner)*\n"
             f"{E['blue_arrow']} `$preorder PO-XXXX` — Look up a pre-order *(Staff / Owner)*\n"
             f"{E['alert']} `$deletepreorder PO-XXXX` — Remove an accidental active/cancelled pre-order *(Owner)*\n\n"
-            f"{E['tick']} Ticket buttons: **Claim • Complete • Cancel • Close**\n"
+            f"{E['tick']} Ticket buttons: **Claim Complete Cancel Close**\n"
             f"{E['ltc']} Deal totals keep **₹ and LTC separate**."
         ),
         color=0xFFFFFF
     )
-    em.set_footer(text="Tower Supplier • Prefix: $")
+    em.set_footer(text="Tower Supplier Prefix: $")
     await ctx.send(embed=em)
 
 load_dotenv();token=os.getenv("DISCORD_TOKEN")
