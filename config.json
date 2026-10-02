@@ -4,22 +4,34 @@
     "name": "Tower Supplier"
   },
   "roles": {
-    "owner": 1539601442489507800,
-    "staff": 1555449482378879200
+    "owner": "1539601442489507892",
+    "staff": "1555449482378879126"
   },
   "channels": {
-    "ticket_category": 1534301860901687300,
-    "vouches": 1539810368170492000,
-    "deal_records": 1555445564995403800,
-    "transcripts": 1555445602844934100
+    "ticket_category": "1534301860901687306",
+    "vouches": "1539810368170492005",
+    "deal_records": "1555445564995403887",
+    "transcripts": "1555445602844934245"
   },
   "emojis": {
+    "amazon_prime": "<:AmazonPrime:1555448009582575648>",
     "announcement": "<a:Announcement:1555448087692967966>",
     "chat": "<a:Chat:1555447917031194684>",
     "ticket": "<:CouplesTicket:1555447943371161701>",
+    "cyan_arrow": "<:Cyan_Arrow:1555447948102340748>",
+    "kitty": "<a:Flantic_kittyTease:1555448137064390786>",
+    "giveaway": "<a:Giveaway:1555448055061422170>",
+    "groot": "<a:Groot_18:1555448124904841226>",
     "ltc": "<:LTC:1539703052095721602>",
+    "mingle": "<a:MINGLE:1555448113781678111>",
     "tick": "<a:Tick_green:1539696403943522404>",
     "blue_arrow": "<a:blue_arrow:1555447881585000468>",
-    "alert": "<a:alert:1555447886114856992>"
+    "cash": "<:cashazul:1555448050510725130>",
+    "dot": "<a:dottt:1555447922756165702>",
+    "money": "<:momney:1555448031803867236>",
+    "trick": "<:trick_supreme:1555448103786512444>",
+    "trick_animated": "<a:trick_supreme:1555448118928212091>",
+    "alert": "<a:alert:1555447886114856992>",
+    "extra": "<a:emoji_1742868432212:1555448025915195463>"
   }
 }
