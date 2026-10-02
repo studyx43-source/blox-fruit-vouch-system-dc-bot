@@ -320,6 +320,20 @@ async def deletepreorder(ctx,oid=""):
     if not o or o["kind"]!="preorder":return await ctx.send("Pre-order not found.")
     if o["status"]=="completed":return await ctx.send("Completed records cannot be deleted.")
     del orders[key];write("orders",orders);await ctx.send(f"{E['tick']} {key} removed.")
+@bot.command()
+async def stock(ctx,*,text=""):
+    if not isstaff(ctx.author):return
+    if not text.strip():
+        return await ctx.send(f"{E['alert']} Usage: `$stock your stock text here`")
+    # Chat-only stock post: keep the user's text exactly, while the bot adds only our custom server emojis.
+    msg=(
+        f"{E['announcement']} **TOWER SUPPLIER STOCK**\n"
+        f"{E['dot']} {text.strip()}\n"
+        f"{E['cash']} **Payment:** ₹ / {E['ltc']} LTC\n"
+        f"{E['blue_arrow']} Open a ticket to order. {E['tick']}"
+    )
+    await ctx.send(msg)
+
 @bot.command(name="help")
 async def helpcmd(ctx):
     em=discord.Embed(
@@ -328,6 +342,7 @@ async def helpcmd(ctx):
             f"{E['ticket']} **Ticket System**\n"
             f"{E['blue_arrow']} `$panel` — Post the Buy / Pre-Order / Support panel *(Owner)*\n"
             f"{E['chat']} `$vouch` — Vouch form uses the claimed staff automatically *(Staff / Owner)*\n"
+            f"{E['announcement']} `$stock <text>` — Post a chat-based stock update *(Staff / Owner)*\n"
             f"{E['tick']} Completed tickets automatically get a **Create Vouch** button\n\n"
             f"{E['money']} **Pre-Orders & Records**\n"
             f"{E['blue_arrow']} `$stats` — View pre-order, deal and vouch stats *(Owner)*\n"
