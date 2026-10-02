@@ -207,25 +207,41 @@ class TicketVouchModal(discord.ui.Modal,title="Vouch for this Deal"):
 
 class VouchModal(discord.ui.Modal,title="Leave a Vouch"):
     oid=discord.ui.TextInput(label="Order / Pre-Order ID",placeholder="BUY-0001 or PO-0001",max_length=20)
-    seller=discord.ui.TextInput(label="Seller",placeholder="@mention seller",max_length=80)
     stars=discord.ui.TextInput(label="Rating",placeholder="1 to 5",max_length=1)
     review=discord.ui.TextInput(label="Review",style=discord.TextStyle.paragraph,max_length=500)
     async def on_submit(self,i):
         oid=str(self.oid).upper().strip();o=read("orders").get(oid)
-        if not o or o.get("status")!="completed":return await i.response.send_message("Completed order not found.",ephemeral=True)
-        if o.get("client_id")!=i.user.id:return await i.response.send_message("That order is not yours.",ephemeral=True)
+        if not o or o.get("status")!="completed":return await i.response.send_message(f"{E['alert']} Completed order not found.",ephemeral=True)
+        if o.get("client_id")!=i.user.id:return await i.response.send_message(f"{E['alert']} That order is not yours.",ephemeral=True)
         vs=read("vouches")
-        if any(v["order_id"]==oid for v in vs.values()):return await i.response.send_message("This order already has a vouch.",ephemeral=True)
-        s=member(i.guild,str(self.seller))
-        if not s or not isstaff(s):return await i.response.send_message("Mention the staff seller.",ephemeral=True)
+        if any(v.get("order_id")==oid for v in vs.values()):return await i.response.send_message(f"{E['alert']} This order already has a vouch.",ephemeral=True)
+        seller_id=o.get("seller_id")
+        if not seller_id:return await i.response.send_message(f"{E['alert']} This order was not claimed by staff.",ephemeral=True)
         try:n=int(str(self.stars))
         except:n=0
-        if n not in range(1,6):return await i.response.send_message("Rating must be 1-5.",ephemeral=True)
-        vid=await newid("vouch","V");vs=read("vouches");pay="LTC" if o.get("currency")=="LTC" else "INR"
-        vs[vid]={"order_id":oid,"seller_id":s.id,"currency":pay,"stars":n,"review":str(self.review),"submitted_by":i.user.id,"created_at":now()};write("vouches",vs)
+        if n not in range(1,6):return await i.response.send_message(f"{E['alert']} Rating must be 1-5.",ephemeral=True)
+        pay="LTC" if o.get("currency")=="LTC" else "INR"
+        vid=await newid("vouch","V");vs=read("vouches")
+        vs[vid]={"order_id":oid,"seller_id":seller_id,"currency":pay,"stars":n,"review":str(self.review),"submitted_by":i.user.id,"created_at":now()};write("vouches",vs)
         ch=i.guild.get_channel(VOUCH)
-        em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER • VERIFIED VOUCH",description=f"{E['ticket']} **Order:** `{oid}`\n{E['blue_arrow']} **Seller:** {s.mention}\n{E['money'] if pay=='INR' else 'ltc'} **Deal Type:** {'₹' if pay=='INR' else 'LTC'} Deal\n⭐ **Rating:** {'⭐'*n}\n{E['chat']} **Review:** {discord.utils.escape_markdown(str(self.review))}\n\n**Vouch ID:** `{vid}`",color=0xFFFFFF)
-        await ch.send(embed=em);await i.response.send_message(f"{E['tick']} Vouch submitted.",ephemeral=True)
+        if not ch:return await i.response.send_message(f"{E['alert']} Vouch channel is not configured.",ephemeral=True)
+        symbol="LTC" if pay=="LTC" else "₹"
+        em=discord.Embed(
+            title=f"{E['tick']} TOWER SUPPLIER • VERIFIED VOUCH",
+            description=(
+                f"{E['ticket']} **Order:** `{oid}`\n"
+                f"{E['blue_arrow']} **Seller:** <@{seller_id}>\n"
+                f"{E['money'] if pay=='INR' else E['ltc']} **Deal Type:** {symbol} Deal\n"
+                f"⭐ **Rating:** {'⭐'*n}\n"
+                f"{E['chat']} **Review:** {discord.utils.escape_markdown(str(self.review))}\n\n"
+                f"**Vouch ID:** `{vid}`"
+            ),
+            color=0xFFFFFF
+        )
+        em.set_footer(text="Seller verified from the staff member who claimed the ticket • Client identity hidden")
+        await ch.send(embed=em)
+        await i.response.send_message(f"{E['tick']} Vouch `{vid}` posted for <@{seller_id}>.",ephemeral=True)
+
 class VouchView(discord.ui.View):
     def __init__(self):super().__init__(timeout=None)
     @discord.ui.button(label="Leave a Vouch",emoji=discord.PartialEmoji.from_str(E["tick"]),style=discord.ButtonStyle.success,custom_id="ts:vouch")
@@ -261,7 +277,7 @@ async def panel(ctx):
 @bot.command()
 async def vouch(ctx):
     if not isstaff(ctx.author):return
-    await ctx.send(embed=discord.Embed(title=f"{E['tick']} LEAVE A VOUCH",description="Enter Order ID, Seller, Rating and Review. No client or amount is shown publicly.",color=0xFFFFFF),view=VouchView())
+    await ctx.send(embed=discord.Embed(title=f"{E['tick']} LEAVE A VOUCH",description="Enter your **Order ID, Rating and Review**. The bot automatically mentions the staff member who claimed your ticket. No client identity or deal amount is shown publicly.",color=0xFFFFFF),view=VouchView())
 @bot.command()
 async def stats(ctx):
     if not isowner(ctx.author):return
@@ -311,7 +327,7 @@ async def helpcmd(ctx):
         description=(
             f"{E['ticket']} **Ticket System**\n"
             f"{E['blue_arrow']} `$panel` — Post the Buy / Pre-Order / Support panel *(Owner)*\n"
-            f"{E['chat']} `$vouch` — Post the public vouch form *(Staff / Owner)*\n"
+            f"{E['chat']} `$vouch` — Vouch form uses the claimed staff automatically *(Staff / Owner)*\n"
             f"{E['tick']} Completed tickets automatically get a **Create Vouch** button\n\n"
             f"{E['money']} **Pre-Orders & Records**\n"
             f"{E['blue_arrow']} `$stats` — View pre-order, deal and vouch stats *(Owner)*\n"
