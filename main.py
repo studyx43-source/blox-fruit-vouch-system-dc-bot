@@ -325,14 +325,24 @@ async def stock(ctx,*,text=""):
     if not isstaff(ctx.author):return
     if not text.strip():
         return await ctx.send(f"{E['alert']} Usage: `$stock your stock text here`")
-    # Chat-only stock post: keep the user's text exactly, while the bot adds only our custom server emojis.
-    msg=(
-        f"{E['announcement']} **TOWER SUPPLIER STOCK**\n"
-        f"{E['dot']} {text.strip()}\n"
-        f"{E['cash']} **Payment:** ₹ / {E['ltc']} LTC\n"
-        f"{E['blue_arrow']} Open a ticket to order. {E['tick']}"
+    em=discord.Embed(
+        title=f"{E['announcement']} TOWER SUPPLIER {E['announcement']}",
+        description=(
+            f"{E['dot']} **STOCK DROP** {E['dot']}\n\n"
+            f"{E['cash']} **AVAILABLE STOCK**\n"
+            f"{text.strip()}\n\n"
+            f"{E['cyan_arrow']}━━━━━━━━━━━━━━━━━━━━{E['cyan_arrow']}\n"
+            f"{E['money']} **PAYMENT METHODS**\n"
+            f"{E['money']} **₹**  {E['dot']}  {E['ltc']} **LTC**\n\n"
+            f"{E['ticket']} **READY TO ORDER?**\n"
+            f"{E['blue_arrow']} Open a **Buy Ticket** and our staff will assist you.\n"
+            f"{E['tick']} Fast response {E['dot']} Verified deals {E['dot']} Easy vouches"
+        ),
+        color=0xFFFFFF
     )
-    await ctx.send(msg)
+    em.set_author(name="Tower Supplier • Live Stock")
+    em.set_footer(text="Tower Supplier • Stock availability can change")
+    await ctx.send(embed=em)
 
 @bot.command(name="help")
 async def helpcmd(ctx):
