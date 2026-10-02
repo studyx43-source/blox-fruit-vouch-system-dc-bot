@@ -87,34 +87,43 @@ class Panel(discord.ui.View):
 
 async def deal(i,oid,o):
     did=await newid("deal","DR"); rs=read("records")
-    rs[did]={"order_id":oid,"kind":o["kind"],"item":o.get("item"),"quantity":o.get("quantity"),"seller_id":o.get("seller_id"),"completed_at":now()}; write("records",rs)
+    rs[did]={"order_id":oid,"kind":o["kind"],"item":o.get("item"),"quantity":o.get("quantity"),"seller_id":o.get("seller_id"),"currency":o.get("currency"),"amount":o.get("amount"),"completed_at":now()}; write("records",rs)
     ch=i.guild.get_channel(RECORD)
     if ch:
         seller=f"<@{o['seller_id']}>" if o.get("seller_id") else "Staff"
         em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER • DEAL COMPLETED",color=0xFFFFFF)
-        em.description=f"Record ID: {did}\nOrder ID: {oid}\nType: {o['kind'].title()}\nSeller: {seller}\nStatus: Completed"
+        pay=f"{E['ltc']} LTC" if o.get("currency")=="LTC" else f"{E['money']} INR"
+        em.description=f"**Record ID:** `{did}`\n**Order ID:** `{oid}`\n**Type:** {o['kind'].title()}\n**Seller:** {seller}\n**Deal:** {pay} • **{o.get('amount','-')}**\n**Status:** {E['tick']} Completed"
         if o.get("item"):em.add_field(name="Item",value=o["item"]);em.add_field(name="Quantity",value=o.get("quantity") or "-")
         em.set_footer(text="Client identity is not displayed.")
         await ch.send(embed=em)
     return did
 async def complete(i,oid,o,currency=None,amount=None):
     orders=read("orders")
-    if orders[oid]["status"]!="active":return await i.response.send_message("Already processed.",ephemeral=True)
-    orders[oid]["status"]="completed";orders[oid]["completed_at"]=now()
+    if orders[oid]["status"]!="active":return await i.response.send_message(f"{E['alert']} Already processed.",ephemeral=True)
+    orders[oid]["status"]="completed"; orders[oid]["completed_at"]=now()
     if not orders[oid].get("seller_id"):orders[oid]["seller_id"]=i.user.id
-    if o["kind"]=="preorder":orders[oid]["currency"]=currency;orders[oid]["amount"]=amount
-    write("orders",orders);did=await deal(i,oid,orders[oid])
-    await i.response.send_message(f"{E['tick']} {oid} completed. Deal record {did} created.")
+    orders[oid]["currency"]=currency; orders[oid]["amount"]=amount
+    write("orders",orders); did=await deal(i,oid,orders[oid])
+    await i.response.send_message(
+        f"{E['tick']} **{oid} COMPLETED**\n{E['money']} Deal: **{currency} {amount}**\n"
+        f"{E['blue_arrow']} Deal Record: `{did}`\n\nClient can now create their vouch below.",
+        view=TicketVouchView()
+    )
 
-class CompletePre(discord.ui.Modal,title="Complete Pre-Order"):
-    currency=discord.ui.TextInput(label="Currency",placeholder="INR or LTC",max_length=3)
-    amount=discord.ui.TextInput(label="Final amount",max_length=30)
+class CompleteDeal(discord.ui.Modal,title="Complete Deal"):
+    currency=discord.ui.TextInput(label="Deal currency",placeholder="INR or LTC",max_length=3)
+    amount=discord.ui.TextInput(label="Final deal amount",placeholder="Example: 500 or 0.0042",max_length=30)
     async def on_submit(self,i):
         cur=str(self.currency).upper().strip()
-        if cur not in ("INR","LTC"):return await i.response.send_message("Use INR or LTC.",ephemeral=True)
+        if cur not in ("INR","LTC"):return await i.response.send_message(f"{E['alert']} Currency must be INR or LTC.",ephemeral=True)
+        raw=str(self.amount).replace(",","").replace("₹","").strip()
+        try:
+            if float(raw)<=0:raise ValueError
+        except ValueError:return await i.response.send_message(f"{E['alert']} Enter a valid positive amount.",ephemeral=True)
         oid,o=bychannel(i.channel_id)
-        if not o:return await i.response.send_message("Pre-order not found.",ephemeral=True)
-        await complete(i,oid,o,cur,str(self.amount).strip())
+        if not o or o["kind"]=="support":return await i.response.send_message("Order not found.",ephemeral=True)
+        await complete(i,oid,o,cur,raw)
 class Cancel(discord.ui.Modal,title="Cancel Order"):
     reason=discord.ui.TextInput(label="Reason",style=discord.TextStyle.paragraph,max_length=300)
     async def on_submit(self,i):
@@ -148,8 +157,7 @@ class Actions(discord.ui.View):
         oid,o=bychannel(i.channel_id)
         if not o:return await i.response.send_message("Ticket not found.",ephemeral=True)
         if o["kind"]=="support":return await i.response.send_message("Close support when resolved.",ephemeral=True)
-        if o["kind"]=="preorder":return await i.response.send_modal(CompletePre())
-        await complete(i,oid,o)
+        return await i.response.send_modal(CompleteDeal())
     @discord.ui.button(label="Cancel",style=discord.ButtonStyle.danger,custom_id="ts:cancel")
     async def cancel(self,i,x):
         oid,o=bychannel(i.channel_id)
@@ -164,6 +172,38 @@ class Actions(discord.ui.View):
         try:p.unlink()
         except:pass
         await asyncio.sleep(2);await i.channel.delete(reason=f"Closed {oid}")
+
+class TicketVouchView(discord.ui.View):
+    def __init__(self):super().__init__(timeout=None)
+    @discord.ui.button(label="Create Vouch",style=discord.ButtonStyle.success,custom_id="ts:ticket_vouch")
+    async def create_vouch(self,i,x):
+        oid,o=bychannel(i.channel_id)
+        if not o or o.get("status")!="completed":return await i.response.send_message(f"{E['alert']} This deal must be completed first.",ephemeral=True)
+        if o.get("client_id")!=i.user.id:return await i.response.send_message(f"{E['alert']} Only the client for this order can vouch.",ephemeral=True)
+        await i.response.send_modal(TicketVouchModal(oid))
+
+class TicketVouchModal(discord.ui.Modal,title="Vouch for this Deal"):
+    stars=discord.ui.TextInput(label="Rating",placeholder="1 to 5",max_length=1)
+    review=discord.ui.TextInput(label="Review",style=discord.TextStyle.paragraph,max_length=500)
+    def __init__(self,oid):
+        super().__init__(); self.order_id=oid
+    async def on_submit(self,i):
+        oid=self.order_id; o=read("orders").get(oid); vs=read("vouches")
+        if not o or o.get("status")!="completed":return await i.response.send_message("Completed order not found.",ephemeral=True)
+        if o.get("client_id")!=i.user.id:return await i.response.send_message("This is not your order.",ephemeral=True)
+        if any(v.get("order_id")==oid for v in vs.values()):return await i.response.send_message(f"{E['alert']} This order already has a vouch.",ephemeral=True)
+        try:n=int(str(self.stars))
+        except:n=0
+        if n not in range(1,6):return await i.response.send_message(f"{E['alert']} Rating must be 1-5.",ephemeral=True)
+        seller_id=o.get("seller_id")
+        if not seller_id:return await i.response.send_message("This order has no claimed seller.",ephemeral=True)
+        vid=await newid("vouch","V"); pay="LTC" if o.get("currency")=="LTC" else "INR"
+        vs=read("vouches");vs[vid]={"order_id":oid,"seller_id":seller_id,"currency":pay,"stars":n,"review":str(self.review),"submitted_by":i.user.id,"created_at":now()};write("vouches",vs)
+        ch=i.guild.get_channel(VOUCH)
+        em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER • VERIFIED VOUCH",color=0xFFFFFF)
+        em.description=f"{E['ticket']} **Order:** `{oid}`\n{E['blue_arrow']} **Seller:** <@{seller_id}>\n{E['money'] if pay=='INR' else 'ltc'} **Deal Type:** {pay} Deal\n⭐ **Rating:** {'⭐'*n}\n{E['chat']} **Review:** {discord.utils.escape_markdown(str(self.review))}\n\n**Vouch ID:** `{vid}`"
+        em.set_footer(text="Verified from a completed Tower Supplier ticket • Client identity hidden")
+        await ch.send(embed=em);await i.response.send_message(f"{E['tick']} Vouch `{vid}` posted.",ephemeral=True)
 
 class VouchModal(discord.ui.Modal,title="Leave a Vouch"):
     oid=discord.ui.TextInput(label="Order / Pre-Order ID",placeholder="BUY-0001 or PO-0001",max_length=20)
@@ -181,9 +221,10 @@ class VouchModal(discord.ui.Modal,title="Leave a Vouch"):
         try:n=int(str(self.stars))
         except:n=0
         if n not in range(1,6):return await i.response.send_message("Rating must be 1-5.",ephemeral=True)
-        vid=await newid("vouch","V");vs=read("vouches");vs[vid]={"order_id":oid,"seller_id":s.id,"stars":n,"review":str(self.review),"submitted_by":i.user.id,"created_at":now()};write("vouches",vs)
+        vid=await newid("vouch","V");vs=read("vouches");pay="LTC" if o.get("currency")=="LTC" else "INR"
+        vs[vid]={"order_id":oid,"seller_id":s.id,"currency":pay,"stars":n,"review":str(self.review),"submitted_by":i.user.id,"created_at":now()};write("vouches",vs)
         ch=i.guild.get_channel(VOUCH)
-        em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER VOUCH",description=f"Order ID: {oid}\nSeller: {s.mention}\nRating: {'⭐'*n}\nReview: {discord.utils.escape_markdown(str(self.review))}\n\nVouch ID: {vid}",color=0xFFFFFF)
+        em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER • VERIFIED VOUCH",description=f"{E['ticket']} **Order:** `{oid}`\n{E['blue_arrow']} **Seller:** {s.mention}\n{E['money'] if pay=='INR' else 'ltc'} **Deal Type:** {pay} Deal\n⭐ **Rating:** {'⭐'*n}\n{E['chat']} **Review:** {discord.utils.escape_markdown(str(self.review))}\n\n**Vouch ID:** `{vid}`",color=0xFFFFFF)
         await ch.send(embed=em);await i.response.send_message(f"{E['tick']} Vouch submitted.",ephemeral=True)
 class VouchView(discord.ui.View):
     def __init__(self):super().__init__(timeout=None)
@@ -192,7 +233,7 @@ class VouchView(discord.ui.View):
 
 @bot.event
 async def on_ready():
-    bot.add_view(Panel());bot.add_view(Actions());bot.add_view(VouchView());print("Tower Supplier online",bot.user)
+    bot.add_view(Panel());bot.add_view(Actions());bot.add_view(VouchView());bot.add_view(TicketVouchView());print("Tower Supplier online",bot.user)
 @bot.command()
 async def panel(ctx):
     if not isowner(ctx.author):return
@@ -214,6 +255,17 @@ async def stats(ctx):
                 elif o.get("currency")=="LTC":lt+=v
             except:pass
     await ctx.send(embed=discord.Embed(title=f"{E['money']} TOWER SUPPLIER • STATS",description=f"Pre-Orders: {len(pos)}\nActive: {a}\nCompleted: {c}\nCancelled: {x}\n\nCompleted value\nINR: ₹{ir:,.2f}\nLTC: {lt:.8f} LTC\n\nDeals: {len(read('records'))}\nVouches: {len(read('vouches'))}",color=0xFFFFFF))
+@bot.command()
+async def order(ctx,oid=""):
+    if not isstaff(ctx.author):return
+    key=oid.upper();o=read("orders").get(key)
+    if not o:return await ctx.send(f"{E['alert']} Order not found.")
+    seller=f"<@{o['seller_id']}>" if o.get("seller_id") else "Unclaimed"
+    deal=(f"{o.get('currency')} {o.get('amount')}" if o.get("amount") else "Not completed")
+    em=discord.Embed(title=f"{E['ticket']} ORDER • {key}",color=0xFFFFFF)
+    em.description=f"**Type:** {o.get('kind','-').title()}\n**Item:** {o.get('item') or '-'}\n**Quantity:** {o.get('quantity') or '-'}\n**Payment:** {o.get('payment') or '-'}\n**Status:** {o.get('status','-').title()}\n**Seller:** {seller}\n**Final Deal:** {deal}"
+    await ctx.send(embed=em)
+
 @bot.command()
 async def preorders(ctx):
     if not isowner(ctx.author):return
@@ -240,9 +292,11 @@ async def helpcmd(ctx):
         description=(
             f"{E['ticket']} **Ticket System**\n"
             f"{E['blue_arrow']} `$panel` — Post the Buy / Pre-Order / Support panel *(Owner)*\n"
-            f"{E['chat']} `$vouch` — Post the vouch form *(Staff / Owner)*\n\n"
+            f"{E['chat']} `$vouch` — Post the public vouch form *(Staff / Owner)*\n"
+            f"{E['tick']} Completed tickets automatically get a **Create Vouch** button\n\n"
             f"{E['money']} **Pre-Orders & Records**\n"
             f"{E['blue_arrow']} `$stats` — View pre-order, deal and vouch stats *(Owner)*\n"
+            f"{E['blue_arrow']} `$order BUY-XXXX / PO-XXXX` — View full order *(Staff / Owner)*\n"
             f"{E['blue_arrow']} `$preorders` — View active pre-orders *(Owner)*\n"
             f"{E['blue_arrow']} `$preorder PO-XXXX` — Look up a pre-order *(Staff / Owner)*\n"
             f"{E['alert']} `$deletepreorder PO-XXXX` — Remove an accidental active/cancelled pre-order *(Owner)*\n\n"
