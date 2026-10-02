@@ -78,11 +78,11 @@ class Support(discord.ui.Modal,title="Support"):
     async def on_submit(self,i):await create_ticket(i,"support",issue=str(self.issue))
 class Panel(discord.ui.View):
     def __init__(self):super().__init__(timeout=None)
-    @discord.ui.button(label="Buy",style=discord.ButtonStyle.success,custom_id="ts:buy")
+    @discord.ui.button(label="Buy Now",emoji=discord.PartialEmoji.from_str(E["money"]),style=discord.ButtonStyle.success,custom_id="ts:buy")
     async def b(self,i,x):await i.response.send_modal(Buy())
-    @discord.ui.button(label="Pre-Order",style=discord.ButtonStyle.primary,custom_id="ts:pre")
+    @discord.ui.button(label="Pre-Order",emoji=discord.PartialEmoji.from_str(E["ticket"]),style=discord.ButtonStyle.primary,custom_id="ts:pre")
     async def p(self,i,x):await i.response.send_modal(Pre())
-    @discord.ui.button(label="Support",style=discord.ButtonStyle.secondary,custom_id="ts:sup")
+    @discord.ui.button(label="Support",emoji=discord.PartialEmoji.from_str(E["chat"]),style=discord.ButtonStyle.secondary,custom_id="ts:sup")
     async def s(self,i,x):await i.response.send_modal(Support())
 
 async def deal(i,oid,o):
@@ -92,7 +92,7 @@ async def deal(i,oid,o):
     if ch:
         seller=f"<@{o['seller_id']}>" if o.get("seller_id") else "Staff"
         em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER • DEAL COMPLETED",color=0xFFFFFF)
-        pay=f"{E['ltc']} LTC" if o.get("currency")=="LTC" else f"{E['money']} INR"
+        pay=f"{E['ltc']} LTC" if o.get("currency")=="LTC" else f"{E['money']} ₹"
         em.description=f"**Record ID:** `{did}`\n**Order ID:** `{oid}`\n**Type:** {o['kind'].title()}\n**Seller:** {seller}\n**Deal:** {pay} • **{o.get('amount','-')}**\n**Status:** {E['tick']} Completed"
         if o.get("item"):em.add_field(name="Item",value=o["item"]);em.add_field(name="Quantity",value=o.get("quantity") or "-")
         em.set_footer(text="Client identity is not displayed.")
@@ -175,7 +175,7 @@ class Actions(discord.ui.View):
 
 class TicketVouchView(discord.ui.View):
     def __init__(self):super().__init__(timeout=None)
-    @discord.ui.button(label="Create Vouch",style=discord.ButtonStyle.success,custom_id="ts:ticket_vouch")
+    @discord.ui.button(label="Create Vouch",emoji=discord.PartialEmoji.from_str(E["tick"]),style=discord.ButtonStyle.success,custom_id="ts:ticket_vouch")
     async def create_vouch(self,i,x):
         oid,o=bychannel(i.channel_id)
         if not o or o.get("status")!="completed":return await i.response.send_message(f"{E['alert']} This deal must be completed first.",ephemeral=True)
@@ -201,7 +201,7 @@ class TicketVouchModal(discord.ui.Modal,title="Vouch for this Deal"):
         vs=read("vouches");vs[vid]={"order_id":oid,"seller_id":seller_id,"currency":pay,"stars":n,"review":str(self.review),"submitted_by":i.user.id,"created_at":now()};write("vouches",vs)
         ch=i.guild.get_channel(VOUCH)
         em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER • VERIFIED VOUCH",color=0xFFFFFF)
-        em.description=f"{E['ticket']} **Order:** `{oid}`\n{E['blue_arrow']} **Seller:** <@{seller_id}>\n{E['money'] if pay=='INR' else 'ltc'} **Deal Type:** {pay} Deal\n⭐ **Rating:** {'⭐'*n}\n{E['chat']} **Review:** {discord.utils.escape_markdown(str(self.review))}\n\n**Vouch ID:** `{vid}`"
+        em.description=f"{E['ticket']} **Order:** `{oid}`\n{E['blue_arrow']} **Seller:** <@{seller_id}>\n{E['money'] if pay=='INR' else 'ltc'} **Deal Type:** {'₹' if pay=='INR' else 'LTC'} Deal\n⭐ **Rating:** {'⭐'*n}\n{E['chat']} **Review:** {discord.utils.escape_markdown(str(self.review))}\n\n**Vouch ID:** `{vid}`"
         em.set_footer(text="Verified from a completed Tower Supplier ticket • Client identity hidden")
         await ch.send(embed=em);await i.response.send_message(f"{E['tick']} Vouch `{vid}` posted.",ephemeral=True)
 
@@ -224,11 +224,11 @@ class VouchModal(discord.ui.Modal,title="Leave a Vouch"):
         vid=await newid("vouch","V");vs=read("vouches");pay="LTC" if o.get("currency")=="LTC" else "INR"
         vs[vid]={"order_id":oid,"seller_id":s.id,"currency":pay,"stars":n,"review":str(self.review),"submitted_by":i.user.id,"created_at":now()};write("vouches",vs)
         ch=i.guild.get_channel(VOUCH)
-        em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER • VERIFIED VOUCH",description=f"{E['ticket']} **Order:** `{oid}`\n{E['blue_arrow']} **Seller:** {s.mention}\n{E['money'] if pay=='INR' else 'ltc'} **Deal Type:** {pay} Deal\n⭐ **Rating:** {'⭐'*n}\n{E['chat']} **Review:** {discord.utils.escape_markdown(str(self.review))}\n\n**Vouch ID:** `{vid}`",color=0xFFFFFF)
+        em=discord.Embed(title=f"{E['tick']} TOWER SUPPLIER • VERIFIED VOUCH",description=f"{E['ticket']} **Order:** `{oid}`\n{E['blue_arrow']} **Seller:** {s.mention}\n{E['money'] if pay=='INR' else 'ltc'} **Deal Type:** {'₹' if pay=='INR' else 'LTC'} Deal\n⭐ **Rating:** {'⭐'*n}\n{E['chat']} **Review:** {discord.utils.escape_markdown(str(self.review))}\n\n**Vouch ID:** `{vid}`",color=0xFFFFFF)
         await ch.send(embed=em);await i.response.send_message(f"{E['tick']} Vouch submitted.",ephemeral=True)
 class VouchView(discord.ui.View):
     def __init__(self):super().__init__(timeout=None)
-    @discord.ui.button(label="Leave a Vouch",style=discord.ButtonStyle.success,custom_id="ts:vouch")
+    @discord.ui.button(label="Leave a Vouch",emoji=discord.PartialEmoji.from_str(E["tick"]),style=discord.ButtonStyle.success,custom_id="ts:vouch")
     async def go(self,i,x):await i.response.send_modal(VouchModal())
 
 @bot.event
@@ -237,7 +237,26 @@ async def on_ready():
 @bot.command()
 async def panel(ctx):
     if not isowner(ctx.author):return
-    em=discord.Embed(title=f"{E['ticket']} TOWER SUPPLIER",description=f"{E['blue_arrow']} Buy\n{E['blue_arrow']} Pre-Order\n{E['chat']} Support\n\nChoose below and fill the questions.",color=0xFFFFFF)
+    em=discord.Embed(
+        title=f"{E['ticket']} TOWER SUPPLIER • ORDER CENTER",
+        description=(
+            f"{E['announcement']} **WELCOME TO TOWER SUPPLIER**\n"
+            f"Fast, organized and secure order handling. Choose the correct option below to get started.\n\n"
+            f"{E['money']} **BUY**\n"
+            f"{E['blue_arrow']} Purchase currently available stock.\n"
+            f"{E['dot']} Fill in the item, quantity and payment method.\n\n"
+            f"{E['ticket']} **PRE-ORDER**\n"
+            f"{E['blue_arrow']} Reserve an item/tower before stock is available.\n"
+            f"{E['dot']} Your order receives a permanent `PO-XXXX` ID.\n\n"
+            f"{E['chat']} **SUPPORT**\n"
+            f"{E['blue_arrow']} Questions, order problems or other assistance.\n\n"
+            f"{E['cash']} **PAYMENT METHODS**\n"
+            f"{E['money']} **₹ INR**  •  {E['ltc']} **LTC**\n\n"
+            f"{E['tick']} Completed orders receive a verified deal record and an in-ticket **Create Vouch** option."
+        ),
+        color=0xFFFFFF
+    )
+    em.set_footer(text="Tower Supplier • Invite Only • Select an option below")
     await ctx.send(embed=em,view=Panel())
 @bot.command()
 async def vouch(ctx):
@@ -261,7 +280,7 @@ async def order(ctx,oid=""):
     key=oid.upper();o=read("orders").get(key)
     if not o:return await ctx.send(f"{E['alert']} Order not found.")
     seller=f"<@{o['seller_id']}>" if o.get("seller_id") else "Unclaimed"
-    deal=(f"{o.get('currency')} {o.get('amount')}" if o.get("amount") else "Not completed")
+    deal=(f"{'₹' if o.get('currency')=='INR' else 'LTC'} {o.get('amount')}" if o.get("amount") else "Not completed")
     em=discord.Embed(title=f"{E['ticket']} ORDER • {key}",color=0xFFFFFF)
     em.description=f"**Type:** {o.get('kind','-').title()}\n**Item:** {o.get('item') or '-'}\n**Quantity:** {o.get('quantity') or '-'}\n**Payment:** {o.get('payment') or '-'}\n**Status:** {o.get('status','-').title()}\n**Seller:** {seller}\n**Final Deal:** {deal}"
     await ctx.send(embed=em)
@@ -301,7 +320,7 @@ async def helpcmd(ctx):
             f"{E['blue_arrow']} `$preorder PO-XXXX` — Look up a pre-order *(Staff / Owner)*\n"
             f"{E['alert']} `$deletepreorder PO-XXXX` — Remove an accidental active/cancelled pre-order *(Owner)*\n\n"
             f"{E['tick']} Ticket buttons: **Claim • Complete • Cancel • Close**\n"
-            f"{E['ltc']} Pre-order totals keep **INR and LTC separate**."
+            f"{E['ltc']} Deal totals keep **₹ and LTC separate**."
         ),
         color=0xFFFFFF
     )
