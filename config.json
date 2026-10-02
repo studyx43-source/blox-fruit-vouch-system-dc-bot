@@ -1,0 +1,25 @@
+{
+  "prefix": "$",
+  "branding": {
+    "name": "Tower Supplier"
+  },
+  "roles": {
+    "owner": 1539601442489507800,
+    "staff": 1555449482378879200
+  },
+  "channels": {
+    "ticket_category": 1534301860901687300,
+    "vouches": 1539810368170492000,
+    "deal_records": 1555445564995403800,
+    "transcripts": 1555445602844934100
+  },
+  "emojis": {
+    "announcement": "<a:Announcement:1555448087692967966>",
+    "chat": "<a:Chat:1555447917031194684>",
+    "ticket": "<:CouplesTicket:1555447943371161701>",
+    "ltc": "<:LTC:1539703052095721602>",
+    "tick": "<a:Tick_green:1539696403943522404>",
+    "blue_arrow": "<a:blue_arrow:1555447881585000468>",
+    "alert": "<a:alert:1555447886114856992>"
+  }
+}
